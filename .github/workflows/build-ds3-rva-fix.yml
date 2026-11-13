@@ -1,0 +1,37 @@
+name: Build DS3 task-runner initialization fix
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-ds3-dll:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install the repository's Rust nightly toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: x86_64-pc-windows-msvc
+          components: rustfmt
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Verify formatting
+        run: cargo fmt -- --check
+
+      - name: Build Windows x64 Archipelago DLL
+        run: cargo build --locked --release --target x86_64-pc-windows-msvc -p ds3-archipelago
+
+      - name: Upload test DLL
+        uses: actions/upload-artifact@v4
+        with:
+          name: ds3_archipelago-task-runner-init-fix
+          path: target/x86_64-pc-windows-msvc/release/ds3_archipelago.dll
+          if-no-files-found: error
+          retention-days: 14
