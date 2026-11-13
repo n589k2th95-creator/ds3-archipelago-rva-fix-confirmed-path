@@ -1,12 +1,8 @@
 use std::time::Duration;
 
-use anyhow::{Context, Result};
-use darksouls3::{
-    sprj::{MapItemMan, MenuMan, SprjTaskGroupIndex, SprjTaskImp},
-    util::system::wait_for_system_init,
-};
-use fromsoftware_shared::{FromStatic, Program, SharedTaskImpExt};
-use log::info;
+use anyhow::Result;
+use darksouls3::sprj::{MapItemMan, MenuMan, SprjTaskGroupIndex, SprjTaskImp};
+use fromsoftware_shared::{FromStatic, SharedTaskImpExt};
 
 pub struct DarkSoulsIII;
 
@@ -18,26 +14,8 @@ impl shared::Game for DarkSoulsIII {
     const CLIENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
     fn run_recurring_task(mut task: impl FnMut() + 'static + Send) -> Result<()> {
-        // Do not use SprjTaskImp::wait_for_instance here. On some Wine/Proton
-        // environments that combined helper can fail while translating one of
-        // the task-runner RVAs, producing the otherwise-unhelpful
-        // "Could not translate RVA to VA" initialization error.
-        //
-        // Follow the explicit initialization sequence used by the later
-        // upstream DS3 client: wait until the game has populated its system
-        // reflection data, then resolve the task-runner singleton separately.
-        info!("Waiting for Dark Souls III system initialization...");
-        wait_for_system_init(&Program::current(), Duration::MAX)
-            .context("Waiting for Dark Souls III system initialization failed")?;
-
-        info!("DS3 system initialization completed; resolving SprjTaskImp...");
-        let task_manager = unsafe { SprjTaskImp::instance() }.context(
-            "Resolving the DS3 SprjTaskImp singleton after system initialization failed",
-        )?;
-
-        info!("SprjTaskImp resolved; registering Archipelago frame task...");
-        task_manager.run_recurring(move |_: &'_ usize| task(), SprjTaskGroupIndex::FrameBegin);
-        info!("Archipelago frame task registered.");
+        SprjTaskImp::wait_for_instance(Duration::MAX)?
+            .run_recurring(move |_: &'_ usize| task(), SprjTaskGroupIndex::FrameBegin);
         Ok(())
     }
 
